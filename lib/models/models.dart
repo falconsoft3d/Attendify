@@ -1,78 +1,85 @@
-class OdooConfig {
+class AttendifyConfig {
   final String url;
-  final String database;
-  final String email;
+  final String codigo;
   final String password;
-  final int port;
 
-  OdooConfig({
+  AttendifyConfig({
     required this.url,
-    required this.database,
-    required this.email,
+    required this.codigo,
     required this.password,
-    required this.port,
   });
 
   Map<String, dynamic> toJson() => {
         'url': url,
-        'database': database,
-        'email': email,
+        'codigo': codigo,
         'password': password,
-        'port': port,
       };
 
-  factory OdooConfig.fromJson(Map<String, dynamic> json) => OdooConfig(
-        url: json['url'],
-        database: json['database'],
-        email: json['email'],
+  factory AttendifyConfig.fromJson(Map<String, dynamic> json) => AttendifyConfig(
+        url: json['url'] ?? 'https://openattendify.xyz',
+        codigo: json['codigo'],
         password: json['password'],
-        port: json['port'],
       );
-
-  String get baseUrl {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    return 'https://$url';
-  }
-
-  String get fullUrl {
-    if (port != 443 && port != 80) {
-      return '$baseUrl:$port';
-    }
-    return baseUrl;
-  }
 }
 
 class Attendance {
-  final int? id;
-  final int employeeId;
+  final String? id;
+  final String empleadoId;
   final DateTime checkIn;
   final DateTime? checkOut;
+  final String tipo;
 
   Attendance({
     this.id,
-    required this.employeeId,
+    required this.empleadoId,
     required this.checkIn,
     this.checkOut,
+    required this.tipo,
   });
 
   factory Attendance.fromJson(Map<String, dynamic> json) => Attendance(
         id: json['id'],
-        employeeId: json['employee_id'] is List
-            ? json['employee_id'][0]
-            : json['employee_id'],
-        checkIn: DateTime.parse(json['check_in']),
-        checkOut:
-            json['check_out'] != null ? DateTime.parse(json['check_out']) : null,
+        empleadoId: json['empleadoId'],
+        checkIn: DateTime.parse(json['checkIn'] ?? json['entrada']),
+        checkOut: json['checkOut'] != null || json['salida'] != null
+            ? DateTime.parse(json['checkOut'] ?? json['salida'])
+            : null,
+        tipo: json['tipo'] ?? 'entrada',
       );
 
   Map<String, dynamic> toJson() => {
         if (id != null) 'id': id,
-        'employee_id': employeeId,
-        'check_in': checkIn.toIso8601String(),
-        if (checkOut != null) 'check_out': checkOut!.toIso8601String(),
+        'empleadoId': empleadoId,
+        'checkIn': checkIn.toIso8601String(),
+        if (checkOut != null) 'checkOut': checkOut!.toIso8601String(),
+        'tipo': tipo,
       };
 
   bool get isOpen => checkOut == null;
+}
+
+class EmpleadoInfo {
+  final String id;
+  final String codigo;
+  final String nombre;
+  final String apellido;
+  final String? empresa;
+
+  EmpleadoInfo({
+    required this.id,
+    required this.codigo,
+    required this.nombre,
+    required this.apellido,
+    this.empresa,
+  });
+
+  factory EmpleadoInfo.fromJson(Map<String, dynamic> json) => EmpleadoInfo(
+        id: json['id'],
+        codigo: json['codigo'],
+        nombre: json['nombre'],
+        apellido: json['apellido'],
+        empresa: json['empresa']?.toString(),
+      );
+
+  String get nombreCompleto => '$nombre $apellido';
 }

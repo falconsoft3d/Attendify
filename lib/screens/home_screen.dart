@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
-import '../services/odoo_service.dart';
-import '../services/storage_service.dart';
+import '../services/attendify_service.dart';
 import 'config_screen.dart';
+import 'attendance_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,7 +13,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _odooService = OdooService();
+  final _attendifyService = AttendifyService();
   Attendance? _currentAttendance;
   bool _isLoading = true;
   String? _userName;
@@ -28,14 +28,14 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Obtener configuración y nombre de usuario
-      final config = await StorageService.getConfig();
-      if (config != null) {
-        _userName = config.email.split('@')[0];
+      // Obtener nombre del empleado
+      final empleado = _attendifyService.empleado;
+      if (empleado != null) {
+        _userName = empleado.nombre;
       }
 
       // Verificar si hay asistencia abierta
-      final attendance = await _odooService.getOpenAttendance();
+      final attendance = await _attendifyService.getOpenAttendance();
       
       if (mounted) {
         setState(() {
@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final attendance = await _odooService.checkIn();
+      final attendance = await _attendifyService.checkIn();
       
       if (mounted) {
         setState(() {
@@ -63,6 +63,9 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoading = false;
         });
         _showSuccess('¡Entrada registrada correctamente!');
+        
+        // Recargar el estado para asegurar sincronización
+        await _loadAttendanceStatus();
       }
     } catch (e) {
       if (mounted) {
@@ -73,12 +76,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleCheckOut() async {
-    if (_currentAttendance?.id == null) return;
-
     setState(() => _isLoading = true);
 
     try {
-      final success = await _odooService.checkOut(_currentAttendance!.id!);
+      final success = await _attendifyService.checkOut();
       
       if (mounted) {
         if (success) {
@@ -87,13 +88,20 @@ class _HomeScreenState extends State<HomeScreen> {
             _isLoading = false;
           });
           _showSuccess('¡Salida registrada correctamente!');
+          
+          // Recargar el estado sin mostrar mensajes adicionales
+          await _loadAttendanceStatus();
         } else {
+          // Si falla, recargar y solo mostrar error si realmente falló
+          await _loadAttendanceStatus();
+          
           setState(() => _isLoading = false);
-          _showError('Error al registrar salida');
+          _showError('Error al registrar salida. Intenta nuevamente.');
         }
       }
     } catch (e) {
       if (mounted) {
+        await _loadAttendanceStatus();
         setState(() => _isLoading = false);
         _showError('Error al registrar salida: ${e.toString()}');
       }
@@ -140,8 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (confirm == true) {
-      await StorageService.clearConfig();
-      _odooService.logout();
+      // Solo limpiar la sesión, no los datos guardados
+      _attendifyService.logout();
       
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -179,6 +187,71 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Cerrar sesión',
           ),
         ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      height: 60,
+                      width: 60,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Attendify',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Inicio'),
+              selected: true,
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history),
+              title: const Text('Historial de Asistencias'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AttendanceHistoryScreen(),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Cerrar sesión'),
+              onTap: () {
+                Navigator.pop(context);
+                _logout();
+              },
+            ),
+          ],
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -280,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
 
-                    const Spacer(),
+                    const SizedBox(height: 40),
 
                     // Botón principal
                     SizedBox(

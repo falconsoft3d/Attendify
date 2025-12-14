@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'screens/config_screen.dart';
 import 'screens/home_screen.dart';
-import 'services/odoo_service.dart';
+import 'services/attendify_service.dart';
 import 'services/storage_service.dart';
 
 void main() async {
@@ -97,13 +97,13 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (config != null) {
-      // Configurar servicio de Odoo
-      final odooService = OdooService();
-      odooService.setConfig(config);
+      // Configurar servicio de Attendify
+      final attendifyService = AttendifyService();
+      attendifyService.setConfig(config);
 
       // Intentar autenticar
       try {
-        final authenticated = await odooService.authenticate();
+        final authenticated = await attendifyService.authenticate();
         
         if (!mounted) return;
 
@@ -135,10 +135,14 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              'assets/images/logo.png',
-              width: 150,
-              height: 150,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 150,
+                height: 150,
+                fit: BoxFit.cover,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
